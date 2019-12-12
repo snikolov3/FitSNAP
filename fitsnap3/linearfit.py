@@ -1,28 +1,28 @@
 # <!----------------BEGIN-HEADER------------------------------------>
-# ## FitSNAP3 
+# ## FitSNAP3
 # A Python Package For Training SNAP Interatomic Potentials for use in the LAMMPS molecular dynamics package
-# 
+#
 # _Copyright (2016) Sandia Corporation. Under the terms of Contract DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government retains certain rights in this software. This software is distributed under the GNU General Public License_
 # ##
-# 
-# #### Original author: 
+#
+# #### Original author:
 #     Aidan P. Thompson, athomps (at) sandia (dot) gov (Sandia National Labs)
-#     http://www.cs.sandia.gov/~athomps 
-# 
+#     http://www.cs.sandia.gov/~athomps
+#
 # #### Key contributors (alphabetical):
 #     Mary Alice Cusentino (Sandia National Labs)
 #     Nicholas Lubbers (Los Alamos National Lab)
 #     Adam Stephens (Sandia National Labs)
 #     Mitchell Wood (Sandia National Labs)
-# 
-# #### Additional authors (alphabetical): 
+#
+# #### Additional authors (alphabetical):
 #     Elizabeth Decolvenaere (D. E. Shaw Research)
 #     Stan Moore (Sandia National Labs)
 #     Steve Plimpton (Sandia National Labs)
 #     Gary Saavedra (Sandia National Labs)
 #     Peter Schultz (Sandia National Labs)
 #     Laura Swiler (Sandia National Labs)
-#     
+#
 # <!-----------------END-HEADER------------------------------------->
 
 import numpy as np
@@ -280,6 +280,9 @@ def sklearn_model_to_fn(modelcls,**model_kwargs):
 
     def fitfn(*args,**kwargs):
         model = modelcls(**model_kwargs)
+        #model.coef_ = np.random.rand(1596)*2-1
+        #model.intercept_ = np.zeros(1)
+        #for i in range(10):
         fit_result = model.fit(*args,**kwargs)
         return model.coef_, model, fit_result
     return fitfn
@@ -297,6 +300,8 @@ def get_solver_fn(solver,normweight=None,normratio=None,**kwargs):
                                 alpha=normweight,max_iter=1E6,fit_intercept=False),
         "ELASTIC":
             sklearn_model_to_fn(skl.linear_model.ElasticNet,
-                                alpha=normweight,l1_ratio=normratio,max_iter=1E6,fit_intercept=False)
+                                alpha=normweight,l1_ratio=normratio,max_iter=1E6,fit_intercept=False),
+        "SGD":
+            sklearn_model_to_fn(skl.linear_model.SGDRegressor,penalty='none',alpha=0.0,shuffle=True,max_iter=1E5,fit_intercept=False,learning_rate='adaptive',eta0=1E-9,early_stopping=False,warm_start=True,verbose=1,tol=None)
     }
     return solver_fndict[solver]
