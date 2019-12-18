@@ -1,28 +1,28 @@
 # <!----------------BEGIN-HEADER------------------------------------>
-# ## FitSNAP3 
+# ## FitSNAP3
 # A Python Package For Training SNAP Interatomic Potentials for use in the LAMMPS molecular dynamics package
-# 
+#
 # _Copyright (2016) Sandia Corporation. Under the terms of Contract DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government retains certain rights in this software. This software is distributed under the GNU General Public License_
 # ##
-# 
-# #### Original author: 
+#
+# #### Original author:
 #     Aidan P. Thompson, athomps (at) sandia (dot) gov (Sandia National Labs)
-#     http://www.cs.sandia.gov/~athomps 
-# 
+#     http://www.cs.sandia.gov/~athomps
+#
 # #### Key contributors (alphabetical):
 #     Mary Alice Cusentino (Sandia National Labs)
 #     Nicholas Lubbers (Los Alamos National Lab)
 #     Adam Stephens (Sandia National Labs)
 #     Mitchell Wood (Sandia National Labs)
-# 
-# #### Additional authors (alphabetical): 
+#
+# #### Additional authors (alphabetical):
 #     Elizabeth Decolvenaere (D. E. Shaw Research)
 #     Stan Moore (Sandia National Labs)
 #     Steve Plimpton (Sandia National Labs)
 #     Gary Saavedra (Sandia National Labs)
 #     Peter Schultz (Sandia National Labs)
 #     Laura Swiler (Sandia National Labs)
-#     
+#
 # <!-----------------END-HEADER------------------------------------->
 
 import gzip
@@ -117,3 +117,25 @@ def to_coeff_string(coeffs,bispec_options):
         out += "\n"
     out+= "\n# End of potential"
     return out
+
+def read_coeff_string(bispec_options,fnameinfo):
+    """
+    Read a set of coefficients along with bispec options from a .snapcoeff file
+    """
+    old_coeff = []
+    try:
+        f = open(list(fnameinfo["snapcoeff"])[0])
+    except Exception as e:
+        print("Looking for old old coefficients, %s , but they dont exist!"%list(fnameinfo["snapcoeff"])[0])
+        raise e
+
+    lines = [line for line in f.readlines() if line.strip()]
+    f.close()
+    for line in lines:
+        if line.split()[0] != '#':
+            old_coeff.append(line.split()[0])
+    del old_coeff[0]
+    for atomtype in range(bispec_options["numtypes"]):
+        del old_coeff[bispec_options["n_coeff"]*atomtype]
+    old_coeff = [float(i) for i in old_coeff]
+    return old_coeff

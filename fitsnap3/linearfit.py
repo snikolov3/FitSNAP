@@ -268,8 +268,17 @@ def group_errors(x, configs,bispec_options,subsystems=(True,True,True)):
     all_records = all_records.set_index(["Group", "Weighting", "Subsystem", ]).sort_index()
     return all_records
 
+def set_prior_coeffs(bispec_options): #this is really clunky, would prefer if bispec_options was a global after it is parsed in main()
+    if bispec_options["SGDPrior"]:
+        coeffs = np.array(bispec_options["SGDPriorBeta"])
+        #(np.random.rand(len(bispec_options["SGDPriorBeta"]))*2-1)*np.average(bispec_options["SGDPriorBeta"])
+        intercept = np.zeros(1)
+    else:
+        coeffs = np.zeros(len(bispec_options["SGDPriorBeta"])+1)
+        intercept = np.zeros(1)
+    return coeffs, intercept
 
-def sklearn_model_to_fn(modelcls,**model_kwargs):
+def sklearn_model_to_fn(bispec_options,modelcls,**model_kwargs):
     """
     :param modelcls: sklearn model class, must support .coef_ attribute.
     :param model_kwargs: kwargs to build the model object
@@ -280,28 +289,25 @@ def sklearn_model_to_fn(modelcls,**model_kwargs):
 
     def fitfn(*args,**kwargs):
         model = modelcls(**model_kwargs)
-        #model.coef_ = np.random.rand(1596)*2-1
-        #model.intercept_ = np.zeros(1)
-        #for i in range(10):
+        model.coef_, model.intercept_ = set_prior_coeffs(bispec_options)
         fit_result = model.fit(*args,**kwargs)
         return model.coef_, model, fit_result
     return fitfn
 
-def get_solver_fn(solver,normweight=None,normratio=None,**kwargs):
-    if normweight is not None: normweight = float(10 ** (float(normweight)))
-    if normratio is not None: normratio = float(normratio)
+def get_solver_fn(bispec_options,solver,**kwargs):
     solver_fndict = {
-        "SVD": sp.linalg.lstsq,
+        "SVD":
+            sklearn_model_to_fn(bispec_options,skl.linear_model.LinearRegression,),
         "LASSO":
-            sklearn_model_to_fn(skl.linear_model.Lasso,
-                                alpha=normweight,max_iter=1E6,fit_intercept=False),
+            sklearn_model_to_fn(bispec_options, skl.linear_model.Lasso,
+                                alpha=bispec_options["normweight"],max_iter=1E6,fit_intercept=False),
         "RIDGE":
-            sklearn_model_to_fn(skl.linear_model.Ridge,
-                                alpha=normweight,max_iter=1E6,fit_intercept=False),
+            sklearn_model_to_fn(bispec_options, skl.linear_model.Ridge,
+                                alpha=bispec_options["normweight"],max_iter=1E6,fit_intercept=False),
         "ELASTIC":
-            sklearn_model_to_fn(skl.linear_model.ElasticNet,
-                                alpha=normweight,l1_ratio=normratio,max_iter=1E6,fit_intercept=False),
+            sklearn_model_to_fn(bispec_options, skl.linear_model.ElasticNet,
+                                alpha=bispec_options["normweight"],l1_ratio=bispec_options["normratio"],max_iter=1E6,fit_intercept=False),
         "SGD":
-            sklearn_model_to_fn(skl.linear_model.SGDRegressor,penalty='none',alpha=0.0,shuffle=True,max_iter=1E5,fit_intercept=False,learning_rate='adaptive',eta0=1E-9,early_stopping=False,warm_start=True,verbose=1,tol=None)
+            sklearn_model_to_fn(bispec_options, skl.linear_model.SGDRegressor,penalty='none',alpha=0.0,shuffle=True,max_iter=1E4,fit_intercept=False,learning_rate='adaptive',eta0=1E-20,early_stopping=True,warm_start=True,verbose=1,tol=None)
     }
     return solver_fndict[solver]
