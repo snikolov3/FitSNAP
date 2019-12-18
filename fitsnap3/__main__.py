@@ -31,7 +31,7 @@ import configparser
 import gzip
 import pickle
 import datetime
-
+import numpy as np
 import contextlib
 
 from distutils.util import strtobool
@@ -55,15 +55,15 @@ def parse_cmdline():
                         default=False, help="Show more detailed information about processing")
     parser.add_argument("--lammpslog", "-l", action="store_true", dest="lammpslog",
                         help="Write logs from LAMMPS. Logs will appear in current working directory.")
-    parser.add_argument("--relative", "-r", action="store_true",dest="relative",
+    parser.add_argument("--relative", action="store_true",dest="relative",
                         help="""Put output files in the directory of INFILE. If this flag
                          is not not present, the files are stored in the
                         current working directory.""")
     parser.add_argument("--nofit","-nf",action="store_false",dest="perform_fit",
                         help="Don't perform fit, just compute bispectrum data.")
-    parser.add_argument("--overwrite",action="store_true",dest="overwrite",
+    parser.add_argument("--overwrite","-o",action="store_true",dest="overwrite",
                         help="Allow overwriting existing files")
-    parser.add_argument("--lammps_noexceptions",action="store_true",
+    parser.add_argument("--lammps_noexceptions","--noex",action="store_true",
                         help="Allow LAMMPS compiled without C++ exceptions handling enabled")
     parser.add_argument("--keyword","-k",nargs=3,metavar=("GROUP","NAME","VALUE"),
                         action="append",dest="keyword_replacements",
@@ -72,7 +72,8 @@ def parse_cmdline():
                         may be silently ignored.""")
     parser.add_argument("--mpi", action="store_true", dest="mpi",
                         help="Use MPI for parallelizing lammps (control number of workers with --jobs argument)")
-
+    parser.add_argument("--read_prior","-r", action="store_true",
+                        dest="beta_prior", help="Use existing *.snapcoeff file as a prior solution to a gradient based solver)")
     args = parser.parse_args()
 
     return args
@@ -170,7 +171,6 @@ def main():
                         allow_exists = args.overwrite,
                         **cp["OUTFILE"]
     )
-
     # Check that lammps can open, and whether it has exception handling enabled.
     deploy.check_lammps(args.lammps_noexceptions)
 
@@ -182,6 +182,8 @@ def main():
 
     # Set fallback values if not found in input file
     bispec_options["BOLTZT"] = cp.get("BISPECTRUM","BOLTZT",fallback='10000')
+    bispec_options["normweight"] = cp.get("MODEL","normweight",fallback='-12')
+    bispec_options["normratio"] = cp.get("MODEL","normratio",fallback='0.5')
     bispec_options["compute_testerrs"] = strtobool(cp.get("MODEL","compute_testerrs",fallback=0))
     bispec_options["smartweights"] = strtobool(cp.get("PATH","smartweights",fallback='0'))
     bispec_options["units"] = cp.get("REFERENCE","units",fallback='metal').lower()
@@ -224,6 +226,13 @@ def main():
 
     # If performing fit, do this before saving the computed data.
     # If the fit fails, we still serialize the computed data before dealing with thee error.
+    if args.beta_prior:
+    #Reads in old beta coefficients in potentialname+'.snapcoeff'
+        bispec_options["SGDPrior"] = args.beta_prior
+        bispec_options["SGDPriorBeta"] = serialize.read_coeff_string(bispec_options,fnameinfo)
+    else:
+        bispec_options["SGDPrior"] = False
+        bispec_options["SGDPriorBeta"] = np.zeros(bispec_options["n_coeff"])
     try:
         if args.perform_fit:
             with printdoing("Assembling linear system"):
@@ -232,7 +241,7 @@ def main():
                 A, b, w = linearfit.make_Abw(configs=configs, offset=offset, return_subsystems=False,subsystems=subsystems)
 
             with printdoing("Performing fit"):
-                solver = linearfit.get_solver_fn(**cp["MODEL"])
+                solver = linearfit.get_solver_fn(bispec_options,**cp["MODEL"])
                 fit_coeffs, solver_info = linearfit.solve_linear_snap(A,b,w, solver=solver, offset=offset)
 
             with printdoing("Measuring errors"):
