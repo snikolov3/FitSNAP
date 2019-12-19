@@ -308,6 +308,6 @@ def get_solver_fn(bispec_options,solver,**kwargs):
             sklearn_model_to_fn(bispec_options, skl.linear_model.ElasticNet,
                                 alpha=bispec_options["normweight"],l1_ratio=bispec_options["normratio"],max_iter=1E6,fit_intercept=False),
         "SGD":
-            sklearn_model_to_fn(bispec_options, skl.linear_model.SGDRegressor,penalty='none',alpha=0.0,shuffle=True,max_iter=1E4,fit_intercept=False,learning_rate='adaptive',eta0=1E-20,early_stopping=True,warm_start=True,verbose=1,tol=None)
+            sklearn_model_to_fn(bispec_options, skl.linear_model.SGDRegressor,penalty='none',alpha=0.0,shuffle=True,max_iter=1E3,fit_intercept=False,learning_rate='adaptive',eta0=1E-25,early_stopping=True,warm_start=True,verbose=1,tol=None)
     }
     return solver_fndict[solver]
