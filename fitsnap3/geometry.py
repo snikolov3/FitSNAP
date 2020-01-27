@@ -33,7 +33,7 @@ def units_conv(styles,bispec_options):
     units_conv["Force"] = 1.0
     units_conv["Stress"] = 1.0
     units_conv["Distance"] = 1.0
-    
+
     if (bispec_options["units"]=="metal" and (list(styles["Stress"])[0]=="kbar" or list(styles["Stress"])[0]=="kB")):
         units_conv["Stress"] = 1000.0
 #   Append other exceptions to unit conversion here
@@ -59,7 +59,6 @@ def rotate_coords(data,units_conv):
     # QR decomposition algorithms don't always return a proper rotation
     ss = np.diagflat(np.sign(np.diag(rmat)))
     rot = ss @ qmat.T
-
     assert np.allclose(rot @ rot.T, np.eye(3)), "Rotation matrix not orthogonal"
     assert np.allclose(rot.T @ rot, np.eye(3)), "Rotation matrix not orthogonal"
     assert np.linalg.det(rot) > 0, "Rotation matrix is an improper rotation (det<0)"
@@ -74,17 +73,106 @@ def rotate_coords(data,units_conv):
     lower_triangle = out_cell[np.tril_indices(3, k=-1)]
     assert np.allclose(lower_triangle, 0, atol=1e-13), \
         f"Lower triangle of normalized cell has nonzero-elements: {lower_triangle}"
-
     # Positions and forces transform on the second axis
     # Stress transforms on both the first and second axis.
+
+#    in_cell = array(config['Lattice']).transpose()
+    # Inverse cell is [h k l]^t/V
+    in_cellinv = np.linalg.inv(in_cell)
+    # This is the LAMMPS cell
+    cell = lammps_cell(in_cell)
+    cell_flip(cell)
+    cellprod = np.dot(cell,in_cellinv)
+    # print("Rotation ",cellprod)
+    # print("Orig ",data["Stress"]*units_conv["Stress"])
+    # print("Mod ",np.dot(np.dot(cellprod,data["Stress"]*units_conv["Stress"]),cellprod.T))
     return {
-        "Lattice": out_cell,
-        "Positions": data["Positions"]*units_conv["Distance"] @ rot.T,
-        "Forces": data["Forces"]*units_conv["Force"] @ rot.T,
-        "Stress": rot @ (data["Stress"]*units_conv["Stress"]) @ rot.T,
-        "Rotation": rot,
+        "Lattice": cell,
+        "Positions": np.dot(cellprod,(data["Positions"]*units_conv["Distance"]).T).T,
+        "Forces": np.dot(cellprod,(data["Forces"]*units_conv["Force"]).T).T,
+        "Stress": np.dot(np.dot(cellprod,data["Stress"]*units_conv["Stress"]),cellprod.T),
+        "Rotation": cellprod,
     }
 
+    # return {
+    #     "Lattice": out_cell,
+    #     "Positions": data["Positions"]*units_conv["Distance"] @ rot.T,
+    #     "Forces": data["Forces"]*units_conv["Force"] @ rot.T,
+    #     "Stress": rot @ (data["Stress"]*units_conv["Stress"]) @ rot.T,
+    #     "Rotation": rot,
+    # }
+def cell_flip(cell):
+
+    # Check that yz is not too large for LAMMPS
+
+    if np.abs(cell[1][2]) > 0.5*cell[1][1]:
+        if cell[1][2] < 0.0:
+            cell[1][2] += cell[1][1];
+            cell[0][2] += cell[0][1];
+        else:
+            cell[1][2] -= cell[1][1];
+            cell[0][2] -= cell[0][1];
+
+    # Check that xz is not too large for LAMMPS
+
+    if np.abs(cell[0][2]) > 0.5*cell[0][0]:
+        if cell[0][2] < 0.0:
+            cell[0][2] += cell[0][0];
+        else:
+            cell[0][2] -= cell[0][0];
+
+    # Check that xy is not too large for LAMMPS
+
+    if np.abs(cell[0][1]) > 0.5*cell[0][0]:
+        if cell[0][1] < 0.0:
+            cell[0][1] += cell[0][0];
+        else:
+            cell[0][1] -= cell[0][0];
+
+    return cell
+
+def lammps_cell(cellqm):
+
+    cell = np.zeros((3,3))
+
+    # Compute edge lengths
+
+    cellqmtrans = cellqm.T
+    avec = cellqmtrans[0]
+    bvec = cellqmtrans[1]
+    cvec = cellqmtrans[2]
+    anorm = np.sqrt((avec**2.0).sum())
+    bnorm = np.sqrt((bvec**2.0).sum())
+    cnorm = np.sqrt((cvec**2.0).sum())
+    ahat = avec/anorm
+
+    # Inverse cell is [h k l]^t/V
+
+    cellqminv = np.linalg.inv(cellqm)
+
+    lvec = cellqminv[2]
+    lnorm = np.sqrt((lvec**2.0).sum())
+    lhat = lvec*(1.0/lnorm)
+
+    # ax = |A|
+
+    cell[0][0] = anorm
+
+    # bx = |A|.|B|/|A|
+    # by = Sqrt(|B|^2 - bx^2)
+
+    cell[0][1] = np.dot(ahat,bvec)
+    cell[1][1] = np.sqrt(bnorm**2 - cell[0][1]**2)
+
+    # cx = |A|.|C|/|A|
+    # cy = (|B||C| - bx*cx)/by
+    # cz = Sqrt(C^2 - cx^2 - cy^2 +cz^2)
+
+    cell[0][2] = np.dot(ahat,cvec)
+    cell[1][2] = (np.dot(bvec,cvec) - cell[0][1]*cell[0][2])/cell[1][1]
+    cell[2][2] = np.sqrt(cnorm**2 - cell[0][2]**2 - cell[1][2]**2)
+
+    return cell
 
 def translate_coords(data,units_conv):
     cell = data["Lattice"]

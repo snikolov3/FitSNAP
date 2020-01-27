@@ -75,12 +75,12 @@ def makeAbw_vb(vb_sum,Stress,ref_Stress,Volume,vweight,offset=False,conversion=_
     # switch from pressure tensor to flat stress (SNAP Voigt notation)
 
     flat_stress = Stress[:,[0,1,2,1,0,0],[0,1,2,2,2,1]]
+
     b = (flat_stress-ref_Stress).reshape(s1*s2)
     w = np.repeat(vweight,6)
 
     if conversion is not None: a*= conversion
     if offset: a = zero_type_offset(a)
-
     return a,b,w
 
 
@@ -108,7 +108,13 @@ def make_Abw(configs, offset, return_subsystems=True,subsystems=(True,True,True)
             return submatrices[0]
 
     A, b, w = map(np.concatenate,zip(*submatrices))
-
+    np.save('a.out',A)
+    np.save('b.out',b)
+    np.save('w.out',w)
+    #A_fs2=np.load('../FitSNAP2/A.out.npy')
+    #A=np.reshape(A_fs2,(np.shape(A_fs2)[0],1,np.shape(A_fs2)[1]))
+    #b=np.load('../FitSNAP2/b.out.npy')
+    #w=np.load('../FitSNAP2/w.out.npy')
     if return_subsystems:
         return ((A, b, w), *submatrices)
     return A,b,w
@@ -284,7 +290,7 @@ def sklearn_model_to_fn(bispec_options,modelcls,**model_kwargs):
     :param model_kwargs: kwargs to build the model object
     :return: fitfn(*args,**kwargs): makes a  new model, fits it, and returns coefficients, model, results of fit call.
     """
-    # Check that these qwkargs do instantiate a model.
+    # Check that these kwargs do instantiate a model.
     modelcls(**model_kwargs)
 
     def fitfn(*args,**kwargs):
@@ -297,7 +303,8 @@ def sklearn_model_to_fn(bispec_options,modelcls,**model_kwargs):
 def get_solver_fn(bispec_options,solver,**kwargs):
     solver_fndict = {
         "SVD":
-            sklearn_model_to_fn(bispec_options,skl.linear_model.LinearRegression,),
+        sp.linalg.lstsq,
+#        sklearn_model_to_fn(bispec_options,skl.linear_model.LinearRegression,),
         "LASSO":
             sklearn_model_to_fn(bispec_options, skl.linear_model.Lasso,
                                 alpha=bispec_options["normweight"],max_iter=1E6,fit_intercept=False),

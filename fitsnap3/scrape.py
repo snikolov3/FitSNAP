@@ -73,9 +73,9 @@ def create_smartweights_grouplist(base_path,json_directory):
                     data = json.loads(file.read(),parse_constant=True)
                 except Exception as e:
                      print("Trouble Parsing Training Data: ",fname)
-                     raise e   
+                     raise e
                 current_num_atoms = float(data['Dataset']['Data'][0]['NumAtoms'])
-                num_atoms_group += current_num_atoms   
+                num_atoms_group += current_num_atoms
         group_name = group
         group_size = num_files
         group_eweight = float(1/num_files)
@@ -87,8 +87,8 @@ def create_smartweights_grouplist(base_path,json_directory):
         group_table.at[row_count, 'fweight'] = group_fweight
         group_table.at[row_count, 'vweight'] = group_vweight
 
-        row_count += 1      
-    
+        row_count += 1
+
     new_grouplist_path = os.path.join(base_path,'grouplist_smartweights.in')
     new_grouplist_file = open(new_grouplist_path,'w')
     new_grouplist_file.write("#   Grouplist generated using smartweights" + '\n' + '#')
@@ -98,7 +98,7 @@ def create_smartweights_grouplist(base_path,json_directory):
 
     print("Generating new group weights using smartweights....")
     print(group_table)
-    
+
 
     return group_table
 
@@ -223,7 +223,7 @@ def read_configs(json_folder,group_table,bispec_options):
                 data['eweight'] = wprefac*np.exp((getattr(group_info, 'eweight')-data["Energy"]/float(natoms))/(kb*float(bispec_options["BOLTZT"])))
                 data['fweight'] = wprefac*data['eweight']*getattr(group_info, 'fweight')
                 data['vweight'] = wprefac*data['eweight']*getattr(group_info, 'vweight')
-
+            #print(fname_end,data["Energy"], np.linalg.det(data["Lattice"]))
             all_data.append(data)
 
             all_index += 1
