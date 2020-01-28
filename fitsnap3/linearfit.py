@@ -108,9 +108,9 @@ def make_Abw(configs, offset, return_subsystems=True,subsystems=(True,True,True)
             return submatrices[0]
 
     A, b, w = map(np.concatenate,zip(*submatrices))
-    np.save('a.out',A)
-    np.save('b.out',b)
-    np.save('w.out',w)
+    # np.save('a.out',A)
+    # np.save('b.out',b)
+    # np.save('w.out',w)
     #A_fs2=np.load('../FitSNAP2/A.out.npy')
     #A=np.reshape(A_fs2,(np.shape(A_fs2)[0],1,np.shape(A_fs2)[1]))
     #b=np.load('../FitSNAP2/b.out.npy')
@@ -250,25 +250,6 @@ def group_errors(x, configs,bispec_options,subsystems=(True,True,True)):
                 error_record["Subsystem"] = gtype
                 error_record["Weighting"] = wtype
                 all_records.append(error_record)
-                if bispec_options["compute_testerrs"] and (wtype=="Weighted"):
-                    # Special Case of weighted vector for Training Set
-                    A,b,_ = subsys
-                    for i in range(len(w)):
-                        if w[i]>0.0:w[i]=1.0
-                        else:w[i]=0.0
-                    error_record = get_error_metrics(x, A,b,w)
-                    error_record["Group"] = gname
-                    error_record["Subsystem"] = gtype
-                    error_record["Weighting"] = "CVTrain_Unweight"
-                    all_records.append(error_record)
-                    # Special Case of weighted vector for Test Set
-                    A,b,_ = subsys
-                    w=abs(1-w)# w=0.0 for fitted training, =1.0 for test
-                    error_record = get_error_metrics(x, A,b,w)
-                    error_record["Group"] = gname
-                    error_record["Subsystem"] = gtype
-                    error_record["Weighting"] = "CVTest_Unweight"
-                    all_records.append(error_record)
 
     all_records = pd.DataFrame.from_records(all_records)
     all_records = all_records.set_index(["Group", "Weighting", "Subsystem", ]).sort_index()

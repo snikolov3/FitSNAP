@@ -58,8 +58,8 @@ def compute_bispec_datasets(input_configs, bispec_options, n_procs, mpi=False,ch
         else:
             compute_function = compute_multi
         results = compute_function(input_configs, bispec_options, n_procs, chunk_size, log=log)
-    assert all(i==j==data["Index"] for i,(j,data) in enumerate(results)),\
-        "Configurations dropped or out of order"
+    # assert all(i==j==data["Index"] for i,(j,data) in enumerate(results)), \
+    #     "Configurations dropped or out of order"
     return results
 
 ### Compute using single process
@@ -96,9 +96,7 @@ def initializer():
     else:
         lmpGLOBAL = lammps.lammps(cmdargs=["-screen","none","-log","none"])
 
-
 # Worker function for Multiprocessing
-
 def compute_partial(inputs):
     i, data = inputs
     data = copy.deepcopy(data)
@@ -110,10 +108,9 @@ def compute_partial(inputs):
     return (i, data)
 
 #Dispatch function for Multiprocessing
-
 def compute_multi(data_dict, bispec_options, n_procs, chunk_size=DEFAULT_CHUNKSIZE,log=DEFAULT_LAMMPS_LOG):
     global chunkGLOBAL, bispecGLOBAL, lmplogGLOBAL
-
+    results = []
     chunkGLOBAL = chunk_size
     bispecGLOBAL = bispec_options
     lmplogGLOBAL = log
@@ -127,7 +124,6 @@ def compute_multi(data_dict, bispec_options, n_procs, chunk_size=DEFAULT_CHUNKSI
     return results
 
 ### Worker function using MPI (slight difference because MPI pool doesn't allow an initializer)
-
 def compute_partial_mpi(inputs,bispec=None):
     try:
         if lmpGLOBAL is None:
